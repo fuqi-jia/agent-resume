@@ -27,7 +27,7 @@ def _storage(config_file: str | None = None) -> Storage:
 
 
 def _as_list(value: object) -> list[str]:
-    """Return ``[str(value)]`` when truthy, otherwise an empty list."""
+    """Return a single-element list wrapping value when truthy, otherwise an empty list."""
     return [str(value)] if value else []
 
 
