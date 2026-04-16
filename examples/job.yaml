@@ -1,4 +1,4 @@
-name: gomt-job
+name: example-job
 dir: /path/to/project
 session_id: xxx
 cron: "0 */4 * * *"

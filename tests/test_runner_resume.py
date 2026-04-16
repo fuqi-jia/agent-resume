@@ -4,11 +4,6 @@ import tempfile
 import unittest
 from pathlib import Path
 
-import sys
-
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "src"))
-
 from agent_resume.models import Job
 from agent_resume.runner_exec import run_job
 from agent_resume.storage import Storage

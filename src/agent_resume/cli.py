@@ -26,6 +26,11 @@ def _storage(config_file: str | None = None) -> Storage:
     return Storage(cfg["storage_dir"])
 
 
+def _as_list(value: object) -> list[str]:
+    """Return ``[str(value)]`` when truthy, otherwise an empty list."""
+    return [str(value)] if value else []
+
+
 @schedule_cli.command("once")
 def schedule_once_cmd(
     dir: str = typer.Option(..., "--dir"),
@@ -87,17 +92,17 @@ def schedule_recurring_cmd(
 
 
 @schedule_cli.command("from-config")
-def schedule_from_config(file: str = typer.Option(..., "--file"), config: str | None = typer.Option(None, "--config")) -> None:
+def schedule_from_config(
+    file: str = typer.Option(..., "--file"),
+    config: str | None = typer.Option(None, "--config"),
+) -> None:
     import yaml
 
     data = yaml.safe_load(Path(file).expanduser().read_text(encoding="utf-8")) or {}
-    prompt_value = data["prompt"] if "prompt" in data and data["prompt"] else None
-    template_value = data["template"] if "template" in data and data["template"] else None
-    prompt_file_value = data["prompt_file"] if "prompt_file" in data and data["prompt_file"] else None
     prompts = collect_prompts(
-        prompt=[prompt_value] if prompt_value else [],
-        template=[template_value] if template_value else [],
-        prompt_file=[prompt_file_value] if prompt_file_value else [],
+        prompt=_as_list(data.get("prompt")),
+        template=_as_list(data.get("template")),
+        prompt_file=_as_list(data.get("prompt_file")),
         prompt_dir=data.get("prompt_dir"),
     )
     common = dict(
@@ -194,7 +199,11 @@ def run_now(job_id: str, config: str | None = typer.Option(None, "--config")) ->
 
 
 @app.command("log")
-def show_log(job_id: str, prompt_index: int | None = typer.Option(None, "--prompt-index"), config: str | None = typer.Option(None, "--config")) -> None:
+def show_log(
+    job_id: str,
+    prompt_index: int | None = typer.Option(None, "--prompt-index"),
+    config: str | None = typer.Option(None, "--config"),
+) -> None:
     st = _storage(config)
     path = st.log_path(job_id, prompt_index)
     if not path.exists():
