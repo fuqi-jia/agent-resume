@@ -1,0 +1,19 @@
+default_agent_type: claude
+default_agent_bin: /home/fuqi/.local/bin/claude
+
+storage_dir: ~/.agent-resume
+log_dir: ~/.agent-resume/logs
+runner_dir: ~/.agent-resume/runners
+
+defaults:
+  queue_mode: resume
+  on_prompt_failure: stop
+  prompt_interval_seconds: 0
+  concurrency_policy: skip
+
+claude:
+  command_template: "{agent_bin} --resume {session_id} --print {prompt}"
+  usage_limit_patterns:
+    - "You're out of extra usage"
+    - "rate limit"
+    - "quota exceeded"

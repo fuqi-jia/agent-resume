@@ -1,0 +1,4 @@
+[
+  { "name": "summary", "prompt": "Summarize current progress and blockers." },
+  { "name": "continue", "prompt": "Continue from last checkpoint with concrete next changes." }
+]

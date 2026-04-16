@@ -1,0 +1,6 @@
+name: gomt-job
+dir: /path/to/project
+session_id: xxx
+cron: "0 */4 * * *"
+prompt_file: examples/prompts.txt
+queue_mode: resume
