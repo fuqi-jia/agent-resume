@@ -73,12 +73,15 @@ def run_job(job_id: str, config_file: str | None = None) -> int:
     if job.type == "recurring" and job.concurrency_policy == "skip" and not _acquire_lock(storage, job):
         return 0
     if job.type == "recurring" and job.concurrency_policy != "skip" and not _acquire_lock(storage, job):
-        job.last_failure_reason = f"concurrency policy '{job.concurrency_policy}' is not implemented"
+        job.last_failure_reason = (
+            f"Concurrency policy '{job.concurrency_policy}' is not supported. "
+            "Only 'skip' is currently implemented."
+        )
         job.last_exit_code = 2
         storage.upsert_job(job)
         return 2
 
-    exit_code = 0
+    final_code = 0
     template = _command_template(cfg, job)
     usage_patterns = _usage_limit_patterns(cfg, job)
     total = len(job.prompt_queue)
@@ -114,7 +117,8 @@ def run_job(job_id: str, config_file: str | None = None) -> int:
                 job.last_failure_reason = "usage_limit_detected"
                 job.last_exit_code = proc.returncode
                 storage.upsert_job(job)
-                return proc.returncode if proc.returncode != 0 else 1
+                final_code = proc.returncode if proc.returncode != 0 else 1
+                return final_code
 
             if proc.returncode != 0:
                 job.last_failure_reason = f"prompt_{idx + 1}_failed"
@@ -130,7 +134,8 @@ def run_job(job_id: str, config_file: str | None = None) -> int:
                 job.queue_status = "partially_completed"
                 job.status = "failed"
                 storage.upsert_job(job)
-                return proc.returncode
+                final_code = proc.returncode
+                return final_code
 
             job.current_prompt_index = idx + 1
             job.queue_status = "partially_completed" if job.current_prompt_index < total else "completed"
@@ -144,11 +149,12 @@ def run_job(job_id: str, config_file: str | None = None) -> int:
         job.queue_status = "completed"
         job.current_prompt_index = total
         storage.upsert_job(job)
-        return 0
+        final_code = 0
+        return final_code
     finally:
         if job.type == "recurring":
             _release_lock(storage, job)
-        _append_log(Path(job.log_file_path), f"[{now_iso()}] Run finished code={exit_code}\n")
+        _append_log(Path(job.log_file_path), f"[{now_iso()}] Run finished code={final_code}\n")
 
 
 def main() -> None:

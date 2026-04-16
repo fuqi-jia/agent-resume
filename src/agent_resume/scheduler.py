@@ -66,6 +66,7 @@ def _make_job(
     storage.ensure_dirs()
     job_id = generate_job_id()
     defaults = cfg.get("defaults", {})
+    interval = prompt_interval_seconds if prompt_interval_seconds is not None else defaults.get("prompt_interval_seconds", 0)
     job = Job(
         job_id=job_id,
         type=job_type,
@@ -80,7 +81,7 @@ def _make_job(
         created_at=now_iso(),
         queue_mode=queue_mode or defaults.get("queue_mode", "resume"),
         on_prompt_failure=on_prompt_failure or defaults.get("on_prompt_failure", "stop"),
-        prompt_interval_seconds=int(prompt_interval_seconds if prompt_interval_seconds is not None else defaults.get("prompt_interval_seconds", 0)),
+        prompt_interval_seconds=int(interval),
         concurrency_policy=concurrency_policy or defaults.get("concurrency_policy", "skip"),
         agent_type=agent_type or cfg.get("default_agent_type", "claude"),
         agent_bin=agent_bin or cfg.get("default_agent_bin"),

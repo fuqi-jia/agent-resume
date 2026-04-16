@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.scripts]
-agent-resume = "agent_resume.cli:app"
+agent-resume = "agent_resume.cli:main"
 
 [tool.setuptools]
 package-dir = { "" = "src" }
