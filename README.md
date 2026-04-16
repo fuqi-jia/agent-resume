@@ -1,7 +1,8 @@
 # agent-resume
 
-> **带有持久化 prompt queue、断点续跑、定时调度（once + recurring）、配置管理的终端 coding agent 调度器。**  
-> A stateful CLI scheduler for coding agents with persistent prompt queues, resume-on-interrupt, and once/recurring scheduling.
+> A stateful scheduler for terminal coding agents with persistent prompt queues and resume-on-interrupt.
+
+agent-resume lets you define a queue of prompts and run them one by one through your CLI coding agent (e.g. Claude, Aider, Codex CLI). Jobs can be scheduled once via `at` or on a recurring schedule via `crontab`. When a usage limit or interruption stops execution mid-queue, agent-resume records exactly where it left off and resumes from that prompt on the next run — no manual intervention needed. A global config file and per-job overrides control agent binary, queue behavior, failure policy, and usage-limit detection patterns.
 
 ---
 
@@ -16,21 +17,14 @@
 - [Config 配置系统 / Config System](#config-system--配置系统)
 - [CLI 命令参考 / CLI Reference](#cli-reference--命令参考)
 - [数据存储结构 / Storage Layout](#storage-layout--数据目录)
+- [Known Limitations](#known-limitations)
 - [Roadmap](#roadmap)
 
 ---
 
 ## Why / 为什么
 
-普通脚本封装 agent 时存在以下问题：  
-Plain shell wrappers for agents have fundamental limitations:
-
-| 问题 Problem | agent-resume 解决方案 Solution |
-|---|---|
-| 多 prompt 手动串联，中断丢失进度 | prompt queue 持久化，每条独立执行 |
-| usage limit / rate limit 后任务丢失 | 自动检测，保留剩余队列，下次继续 |
-| recurring 任务重复跑已完成 prompt | 检查 `current_prompt_index`，跳过已完成 |
-| 无法暂停 / 恢复 / 重置任务状态 | `pause` / `resume-job` / `reset-queue` |
+Long-running coding-agent workflows often break in the middle: usage limits are hit, shells close, machines reboot, or recurring jobs rerun work that was already completed. agent-resume is designed to make these workflows stateful: it persists prompt queues, resumes from the last incomplete step, and provides basic job control and inspection commands.
 
 ---
 
@@ -54,6 +48,20 @@ agent-resume doctor
 ---
 
 ## Quick Start / 快速上手
+
+### 最小可跑示例 / Minimal example
+
+Copy and run this to try agent-resume immediately:
+
+```bash
+agent-resume init-config
+agent-resume schedule once \
+  --dir "$PWD" \
+  --session demo-session \
+  --time "now + 1 minute" \
+  --prompt "Summarize current repository status."
+agent-resume list
+```
 
 ### 1. 初始化配置 / Init config
 
@@ -184,6 +192,16 @@ Continue the implementation from the last checkpoint.
 }
 ```
 
+### 具体场景示例
+
+Suppose a job has three prompts:
+
+1. **prompt 1** — completes successfully.
+2. **prompt 2** — the agent hits a usage limit mid-run; agent-resume marks it as `interrupted` and records `current_prompt_index = 1`.
+3. **prompt 3** — not yet executed.
+
+On the next scheduled run, agent-resume reads `current_prompt_index = 1` and restarts from **prompt 2**, skipping prompt 1. Once prompt 2 finishes, it continues with prompt 3. No manual intervention is needed.
+
 - **`--queue-mode resume`**（默认）：从 `current_prompt_index` 继续，已完成 prompt 不重复执行。
 - **`--queue-mode restart`**：每次从队列第一个 prompt 重新开始（适合 recurring 任务每次全量执行）。
 
@@ -207,10 +225,12 @@ agent-resume reset-queue JOB_ID
 
 agent-resume 会：
 
-1. 立即停止当前 prompt 执行
+1. 将当前 prompt 标记为 `interrupted`
 2. 将 `queue_status` 设为 `partially_completed`
 3. `current_prompt_index` 保留在中断位置
 4. 等待下一次调度（cron）时从中断位置继续
+
+> If usage-limit patterns are detected in the agent output or the agent exits abnormally with a quota-related failure, agent-resume marks the current prompt as interrupted and resumes from it on the next run.
 
 **无需手动干预**，recurring 任务会自动在下次调度时接着跑。
 
@@ -252,6 +272,12 @@ claude:
 
 `command_template` 支持变量：`{agent_bin}`、`{session_id}`、`{prompt}`。
 
+### 配置优先级 / Priority order
+
+```text
+CLI arguments > job config > global config > built-in defaults
+```
+
 ---
 
 ## CLI Reference / 命令参考
@@ -264,7 +290,7 @@ claude:
 | `schedule recurring --dir D --session S --cron C [prompt options]` | 通过 `crontab` 循环调度 |
 | `schedule from-config --file job.yaml` | 从 YAML job 配置创建 |
 
-**Prompt 选项（可组合使用）：**
+**Prompt 选项（四者互斥，每次只能指定一种 prompt source）：**
 
 ```
 --prompt TEXT          单条 prompt
@@ -272,6 +298,8 @@ claude:
 --prompt-file FILE     .txt 或 .json 文件
 --prompt-dir DIR       目录（加载所有文件）
 ```
+
+> Specify exactly one of `--prompt`, `--template`, `--prompt-file`, or `--prompt-dir`. Combining multiple prompt sources is not supported.
 
 **执行策略选项：**
 
@@ -289,6 +317,14 @@ claude:
 | `list` | 列出所有 job |
 | `show JOB_ID` | 查看 job 详细信息（JSON） |
 | `queue JOB_ID` | 查看 prompt 队列及当前位置 |
+
+**状态枚举 / Status values:**
+
+| Object | States |
+|---|---|
+| job | `scheduled`, `paused`, `cancelled`, `completed`, `failed` |
+| queue | `pending`, `running`, `partially_completed`, `completed`, `failed` |
+| prompt | `pending`, `running`, `completed`, `failed`, `interrupted` |
 
 ### 控制 / Control
 
@@ -329,12 +365,31 @@ claude:
     └── JOB_ID.sh            # 调度入口脚本（调用 runner_exec）
 ```
 
+`jobs.json` is the source of truth for queue progress and resume state.
+
+---
+
+## Known Limitations
+
+- Primarily tested on **Linux and macOS**; Windows is not currently supported.
+- `once` scheduling depends on the `at` command being available.
+- `recurring` scheduling depends on `crontab` being available; Windows Task Scheduler is not yet supported.
+- Usage-limit detection is based on output pattern matching and is not guaranteed to work with every agent binary or version.
+- Concurrency policy is currently limited to `skip` (only one concurrent execution per job).
+
 ---
 
 ## Roadmap
 
-- [ ] recurring 并发策略 `queue` / `restart` 完整实现
-- [ ] 更丰富的 job 过滤和状态可视化
-- [ ] 更多 agent 适配（Cursor CLI、Aider、Codex CLI 等）
-- [ ] 更完整的集成测试
-- [ ] Web UI / TUI 监控面板
+**Near term**
+- [ ] Concurrency policies: `queue` and `restart` modes fully implemented
+- [ ] Richer job filtering, sorting, and status display
+
+**Mid term**
+- [ ] More agent backends: Cursor CLI, Aider, Codex CLI, and others
+- [ ] Richer retry and backoff strategies for failed prompts
+- [ ] Expanded integration test coverage
+
+**Long term**
+- [ ] TUI / Web dashboard for monitoring jobs and queues
+- [ ] Notifications on job completion or failure (email, webhook)
