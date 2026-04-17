@@ -16,10 +16,12 @@ DEFAULT_CONFIG = {
         "on_prompt_failure": "stop",
         "prompt_interval_seconds": 0,
         "concurrency_policy": "skip",
+        "schedule_dir": ".",
+        "schedule_delay": "now + 4 hours",
     },
     "claude": {
         "command_template": "{agent_bin} {extra_flags} --resume {session_id} --print {prompt}",
-        "extra_flags": "--dangerously-skip-permissions",
+        "extra_flags": "",
         "usage_limit_patterns": [
             "You're out of extra usage",
             "rate limit",
