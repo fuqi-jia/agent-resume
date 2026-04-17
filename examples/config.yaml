@@ -10,9 +10,12 @@ defaults:
   on_prompt_failure: stop
   prompt_interval_seconds: 0
   concurrency_policy: skip
+  schedule_dir: "."           # default project dir for schedule commands (. = cwd)
+  schedule_delay: "now + 4 hours"  # default time offset for `schedule once` when --time is omitted
 
 claude:
-  command_template: "{agent_bin} --resume {session_id} --print {prompt}"
+  command_template: "{agent_bin} {extra_flags} --resume {session_id} --print {prompt}"
+  extra_flags: ""   # set to "--dangerously-skip-permissions" to skip interactive permission prompts
   usage_limit_patterns:
     - "You're out of extra usage"
     - "rate limit"

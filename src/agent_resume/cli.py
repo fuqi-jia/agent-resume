@@ -33,9 +33,9 @@ def _as_list(value: object) -> list[str]:
 
 @schedule_cli.command("once")
 def schedule_once_cmd(
-    dir: str = typer.Option(..., "--dir"),
+    dir: str | None = typer.Option(None, "--dir", help="Project directory (default: current working directory)"),
     session: str = typer.Option(..., "--session"),
-    time: str = typer.Option(..., "--time"),
+    time: str | None = typer.Option(None, "--time", help="Schedule time expression (default: now + 4 hours)"),
     prompt: list[str] = typer.Option(None, "--prompt"),
     template: list[str] = typer.Option(None, "--template"),
     prompt_file: list[str] = typer.Option(None, "--prompt-file"),
@@ -46,11 +46,15 @@ def schedule_once_cmd(
     concurrency_policy: str = typer.Option("skip", "--concurrency-policy"),
     config: str | None = typer.Option(None, "--config"),
 ) -> None:
+    cfg = load_config(config)
+    defaults = cfg.get("defaults", {})
+    resolved_dir = dir if dir is not None else defaults.get("schedule_dir", ".")
+    resolved_time = time if time is not None else defaults.get("schedule_delay", "now + 4 hours")
     prompts = collect_prompts(prompt, template, prompt_file, prompt_dir)
     job = schedule_once(
-        project_dir=dir,
+        project_dir=resolved_dir,
         session_id=session,
-        time_expr=time,
+        time_expr=resolved_time,
         prompts=prompts,
         queue_mode=queue_mode,
         on_prompt_failure=on_prompt_failure,
@@ -58,12 +62,12 @@ def schedule_once_cmd(
         concurrency_policy=concurrency_policy,
         config_file=config,
     )
-    print(f"[green]Scheduled once job:[/green] {job.job_id}")
+    print(f"[green]Scheduled once job:[/green] {job.job_id} (time: {resolved_time}, dir: {resolved_dir})")
 
 
 @schedule_cli.command("recurring")
 def schedule_recurring_cmd(
-    dir: str = typer.Option(..., "--dir"),
+    dir: str | None = typer.Option(None, "--dir", help="Project directory (default: current working directory)"),
     session: str = typer.Option(..., "--session"),
     cron: str = typer.Option(..., "--cron"),
     prompt: list[str] = typer.Option(None, "--prompt"),
@@ -76,9 +80,12 @@ def schedule_recurring_cmd(
     concurrency_policy: str = typer.Option("skip", "--concurrency-policy"),
     config: str | None = typer.Option(None, "--config"),
 ) -> None:
+    cfg = load_config(config)
+    defaults = cfg.get("defaults", {})
+    resolved_dir = dir if dir is not None else defaults.get("schedule_dir", ".")
     prompts = collect_prompts(prompt, template, prompt_file, prompt_dir)
     job = schedule_recurring(
-        project_dir=dir,
+        project_dir=resolved_dir,
         session_id=session,
         cron_expr=cron,
         prompts=prompts,
@@ -88,7 +95,7 @@ def schedule_recurring_cmd(
         concurrency_policy=concurrency_policy,
         config_file=config,
     )
-    print(f"[green]Scheduled recurring job:[/green] {job.job_id}")
+    print(f"[green]Scheduled recurring job:[/green] {job.job_id} (dir: {resolved_dir})")
 
 
 @schedule_cli.command("from-config")

@@ -51,17 +51,17 @@ agent-resume doctor
 
 ### 最小可跑示例 / Minimal example
 
-Copy and run this to try agent-resume immediately:
+Copy and run this to try agent-resume immediately (omitting `--dir` and `--time` uses built-in defaults):
 
 ```bash
 agent-resume init-config
 agent-resume schedule once \
-  --dir "$PWD" \
   --session demo-session \
-  --time "now + 1 minute" \
   --prompt "Summarize current repository status."
 agent-resume list
 ```
+
+`--dir` defaults to the current working directory; `--time` defaults to `"now + 4 hours"`.
 
 ### 1. 初始化配置 / Init config
 
@@ -72,7 +72,15 @@ agent-resume init-config
 
 ### 2. 一次性任务（once）
 
-4 小时后运行一次，使用 `at` 调度：
+4 小时后运行一次，使用 `at` 调度（`--dir` 和 `--time` 均可省略，使用默认值）：
+
+```bash
+agent-resume schedule once \
+  --session SESSION_ID \
+  --prompt "Summarize the current implementation status."
+```
+
+也可以显式指定目录和时间：
 
 ```bash
 agent-resume schedule once \
@@ -86,19 +94,16 @@ agent-resume schedule once \
 
 ```bash
 agent-resume schedule once \
-  --dir /path/to/project \
   --session SESSION_ID \
-  --time "now + 1 hour" \
   --prompt-file examples/prompts.txt
 ```
 
 ### 3. 重复任务（recurring）
 
-每 4 小时执行一次，使用 `crontab` 调度（不覆盖其他 crontab 条目）：
+每 4 小时执行一次，使用 `crontab` 调度（`--dir` 可省略，默认当前目录）：
 
 ```bash
 agent-resume schedule recurring \
-  --dir /path/to/project \
   --session SESSION_ID \
   --cron "0 */4 * * *" \
   --prompt-file examples/prompts.txt \
@@ -261,16 +266,36 @@ defaults:
   on_prompt_failure: stop      # stop | continue
   prompt_interval_seconds: 0
   concurrency_policy: skip     # skip（当前仅支持 skip）
+  schedule_dir: "."            # default --dir for schedule commands (. = cwd)
+  schedule_delay: "now + 4 hours"  # default --time for `schedule once`
 
 claude:
-  command_template: "{agent_bin} --resume {session_id} --print {prompt}"
+  command_template: "{agent_bin} {extra_flags} --resume {session_id} --print {prompt}"
+  extra_flags: ""   # set to "--dangerously-skip-permissions" to skip interactive permission prompts
   usage_limit_patterns:
     - "You're out of extra usage"
     - "rate limit"
     - "quota exceeded"
 ```
 
-`command_template` 支持变量：`{agent_bin}`、`{session_id}`、`{prompt}`。
+`command_template` 支持变量：`{agent_bin}`、`{session_id}`、`{prompt}`、`{extra_flags}`。
+
+`extra_flags` 用于向 agent CLI 注入跳过交互式询问所需的标志（flags）。默认为空字符串，需要时可显式设置：
+
+```yaml
+# 跳过 Claude 的交互式权限询问（明确知晓影响时再使用）
+claude:
+  extra_flags: "--dangerously-skip-permissions"
+
+# 其他 CLI 示例 / Example for other CLIs
+gemini:
+  command_template: "{agent_bin} {extra_flags} --session {session_id} --prompt {prompt}"
+  extra_flags: "--yes"
+
+codex:
+  command_template: "{agent_bin} {extra_flags} --resume {session_id} -q {prompt}"
+  extra_flags: "--yes"
+```
 
 ### 配置优先级 / Priority order
 
@@ -286,8 +311,8 @@ CLI arguments > job config > global config > built-in defaults
 
 | 命令 | 说明 |
 |---|---|
-| `schedule once --dir D --session S --time T [prompt options]` | 通过 `at` 一次性调度 |
-| `schedule recurring --dir D --session S --cron C [prompt options]` | 通过 `crontab` 循环调度 |
+| `schedule once --session S [--dir D] [--time T] [prompt options]` | 通过 `at` 一次性调度（`--dir` 默认 cwd，`--time` 默认 `now + 4 hours`） |
+| `schedule recurring --session S --cron C [--dir D] [prompt options]` | 通过 `crontab` 循环调度（`--dir` 默认 cwd） |
 | `schedule from-config --file job.yaml` | 从 YAML job 配置创建 |
 
 **Prompt 选项（四者互斥，每次只能指定一种 prompt source）：**

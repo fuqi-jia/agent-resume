@@ -41,7 +41,12 @@ def _usage_limit_patterns(cfg: dict[str, Any], job: Job) -> list[str]:
 
 def _command_template(cfg: dict[str, Any], job: Job) -> str:
     section = cfg.get(job.agent_type, {})
-    return section.get("command_template", "{agent_bin} --resume {session_id} --print {prompt}")
+    return section.get("command_template", "{agent_bin} {extra_flags} --resume {session_id} --print {prompt}")
+
+
+def _extra_flags(cfg: dict[str, Any], job: Job) -> str:
+    section = cfg.get(job.agent_type, {})
+    return section.get("extra_flags", "")
 
 
 def _build_command(template: str, cfg: dict[str, Any], job: Job, prompt: str) -> str:
@@ -50,6 +55,7 @@ def _build_command(template: str, cfg: dict[str, Any], job: Job, prompt: str) ->
         "agent_bin": shlex.quote(agent_bin),
         "session_id": shlex.quote(job.session_id),
         "prompt": shlex.quote(prompt),
+        "extra_flags": _extra_flags(cfg, job),
     }
     return template.format(**values)
 
