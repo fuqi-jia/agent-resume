@@ -18,7 +18,8 @@ DEFAULT_CONFIG = {
         "concurrency_policy": "skip",
     },
     "claude": {
-        "command_template": "{agent_bin} --resume {session_id} --print {prompt}",
+        "command_template": "{agent_bin} {extra_flags} --resume {session_id} --print {prompt}",
+        "extra_flags": "--dangerously-skip-permissions",
         "usage_limit_patterns": [
             "You're out of extra usage",
             "rate limit",

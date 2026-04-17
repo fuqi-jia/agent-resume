@@ -263,14 +263,30 @@ defaults:
   concurrency_policy: skip     # skip（当前仅支持 skip）
 
 claude:
-  command_template: "{agent_bin} --resume {session_id} --print {prompt}"
+  command_template: "{agent_bin} {extra_flags} --resume {session_id} --print {prompt}"
+  extra_flags: "--dangerously-skip-permissions"
   usage_limit_patterns:
     - "You're out of extra usage"
     - "rate limit"
     - "quota exceeded"
 ```
 
-`command_template` 支持变量：`{agent_bin}`、`{session_id}`、`{prompt}`。
+`command_template` 支持变量：`{agent_bin}`、`{session_id}`、`{prompt}`、`{extra_flags}`。
+
+`extra_flags` 用于向 agent CLI 注入跳过交互式询问所需的标志（flags），例如 Claude 的 `--dangerously-skip-permissions`。其他 CLI 可在各自的配置段中设置对应的 `extra_flags`：
+
+```yaml
+# 其他 CLI 示例 / Example for other CLIs
+gemini:
+  command_template: "{agent_bin} {extra_flags} --session {session_id} --prompt {prompt}"
+  extra_flags: "--yes"
+
+codex:
+  command_template: "{agent_bin} {extra_flags} --resume {session_id} -q {prompt}"
+  extra_flags: "--yes"
+```
+
+不需要跳过交互式询问时，可将 `extra_flags` 设为空字符串，或从配置中省略该字段。
 
 ### 配置优先级 / Priority order
 
